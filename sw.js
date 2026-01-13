@@ -1,11 +1,10 @@
-const CACHE_NAME = 'honeycomb-v1';
+const CACHE_NAME = 'honeycomb-v2';
 const urlsToCache = [
   '/',
   '/index.html',
   '/app.js',
-  '/manifest.json',
-  '/android-launchericon-192-192.png',
-  '/android-launchericon-512-512.png'
+  '/honeycombApi.js',
+  '/manifest.json'
 ];
 
 // Instalación del Service Worker
