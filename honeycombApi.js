@@ -1,5 +1,5 @@
 // API Service para Honeycomb Omnidots
-const API_BASE_URL = 'https://honeycomb.omnidots.com/api/v1';
+const API_BASE_URL = 'https://corsproxy.io/?https://honeycomb.omnidots.com/api/v1';
 
 const HoneycombAPI = {
   // Autenticar usuario
