@@ -1,5 +1,5 @@
 // API Service para Honeycomb Omnidots
-const API_BASE_URL = 'https://api.allorigins.win/raw?url=https://honeycomb.omnidots.com/api/v1';
+const API_BASE_URL = 'https://honeycomb.omnidots.com/api/v1';
 
 const HoneycombAPI = {
   // Autenticar usuario
@@ -7,7 +7,12 @@ const HoneycombAPI = {
     try {
       const response = await fetch(`${API_BASE_URL}/user/authenticate`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 
+          'Content-Type': 'application/json',
+          'Accept': 'application/json'
+        },
+        mode: 'cors',
+        credentials: 'omit',
         body: JSON.stringify({ username, password })
       });
       
@@ -20,16 +25,15 @@ const HoneycombAPI = {
       
       return data;
     } catch (error) {
-      return { ok: false, message: 'Error de conexión' };
+      console.error('Error de autenticación:', error);
+      return { ok: false, message: 'Error de conexión con Honeycomb API. Verifica tu conexión o contacta a Omnidots para habilitar CORS.' };
     }
   },
 
-  // Obtener token guardado
   getStoredToken: () => {
     return localStorage.getItem('honeycomb_token');
   },
 
-  // Verificar si token es válido
   isTokenValid: () => {
     const token = localStorage.getItem('honeycomb_token');
     const tokenDate = localStorage.getItem('honeycomb_token_date');
@@ -40,13 +44,11 @@ const HoneycombAPI = {
     return daysSinceToken < 14;
   },
 
-  // Cerrar sesión
   logout: () => {
     localStorage.removeItem('honeycomb_token');
     localStorage.removeItem('honeycomb_token_date');
   },
 
-  // Obtener puntos de medición
   getMeasuringPoints: async (token) => {
     try {
       const response = await fetch(`${API_BASE_URL}/list_measuring_points?token=${token}`);
@@ -56,7 +58,6 @@ const HoneycombAPI = {
     }
   },
 
-  // Obtener registros PPV
   getPeakRecords: async (token, measuringPointId, limit = 20) => {
     try {
       const response = await fetch(
@@ -68,7 +69,6 @@ const HoneycombAPI = {
     }
   },
 
-  // Obtener último PPV de un punto
   getLatestPPV: async (token, measuringPointId) => {
     try {
       const result = await HoneycombAPI.getPeakRecords(token, measuringPointId, 1);
@@ -83,7 +83,6 @@ const HoneycombAPI = {
     }
   },
 
-  // Parsear datos triaxiales
   parseTriaxialData: (records) => {
     if (!Array.isArray(records)) return [];
     
@@ -104,5 +103,4 @@ const HoneycombAPI = {
   }
 };
 
-// Exportar para usar en app.js
-window.HoneycombAPI = HoneycombAPI;
+window.HoneycombAPI = HoneycombAPI;</parameter>
