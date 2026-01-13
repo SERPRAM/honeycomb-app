@@ -30,9 +30,8 @@ exports.handler = async (event, context) => {
     }
 
     let url = `${HONEYCOMB_API}/${endpoint}`;
-    const queryParams = new URLSearchParams();
 
-    // Para autenticación: convertir body a query params
+    // Para autenticación: enviar como POST con form data
     if (endpoint === 'user/authenticate' && event.body) {
       let bodyData = event.body;
       
@@ -42,26 +41,40 @@ exports.handler = async (event, context) => {
       
       try {
         const credentials = JSON.parse(bodyData);
-        if (credentials.username) queryParams.append('username', credentials.username);
-        if (credentials.password) queryParams.append('password', credentials.password);
+        
+        // Crear form data URL encoded
+        const formData = new URLSearchParams();
+        formData.append('username', credentials.username);
+        formData.append('password', credentials.password);
+        
+        console.log('Auth POST to:', url);
+        
+        const response = await fetch(url, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/x-www-form-urlencoded',
+            'Accept': 'application/json'
+          },
+          body: formData.toString()
+        });
+        
+        const data = await response.json();
+        console.log('Auth response:', JSON.stringify(data));
+        
+        return { statusCode: 200, headers, body: JSON.stringify(data) };
+        
       } catch (e) {
-        console.error('Error parsing body:', e);
+        console.error('Error parsing credentials:', e);
+        return {
+          statusCode: 400,
+          headers,
+          body: JSON.stringify({ ok: false, message: 'Error en credenciales' })
+        };
       }
-      
-      url += `?${queryParams.toString()}`;
-      
-      console.log('Auth URL:', url.replace(/password=[^&]+/, 'password=***'));
-      
-      const response = await fetch(url, {
-        method: 'GET',
-        headers: { 'Accept': 'application/json' }
-      });
-      
-      const data = await response.json();
-      return { statusCode: 200, headers, body: JSON.stringify(data) };
     }
 
-    // Para otros endpoints: agregar parámetros GET normalmente
+    // Para otros endpoints: GET con query params
+    const queryParams = new URLSearchParams();
     Object.keys(params).forEach(key => {
       if (key !== 'endpoint') {
         queryParams.append(key, params[key]);
@@ -71,6 +84,8 @@ exports.handler = async (event, context) => {
     if (queryParams.toString()) {
       url += `?${queryParams.toString()}`;
     }
+
+    console.log('GET:', url);
 
     const response = await fetch(url, {
       method: 'GET',
