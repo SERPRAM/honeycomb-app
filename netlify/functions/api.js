@@ -18,7 +18,6 @@ exports.handler = async (event, context) => {
   }
 
   try {
-    // Obtener el endpoint desde query params
     const params = event.queryStringParameters || {};
     const endpoint = params.endpoint;
 
@@ -30,53 +29,55 @@ exports.handler = async (event, context) => {
       };
     }
 
-    // Construir URL de Honeycomb
     let url = `${HONEYCOMB_API}/${endpoint}`;
-    
-    // Para GET: agregar parámetros a la URL (excepto 'endpoint')
-    if (event.httpMethod === 'GET') {
-      const queryParams = new URLSearchParams();
-      Object.keys(params).forEach(key => {
-        if (key !== 'endpoint') {
-          queryParams.append(key, params[key]);
-        }
-      });
-      
-      if (queryParams.toString()) {
-        url += `?${queryParams.toString()}`;
-      }
-    }
+    const queryParams = new URLSearchParams();
 
-    // Configurar fetch
-    const fetchOptions = {
-      method: event.httpMethod,
-      headers: { 
-        'Content-Type': 'application/json',
-        'Accept': 'application/json'
-      }
-    };
-
-    // Si es POST, incluir body directamente
-    if (event.httpMethod === 'POST' && event.body) {
-      // Parsear el body si viene como string
+    // Para autenticación: convertir body a query params
+    if (endpoint === 'user/authenticate' && event.body) {
       let bodyData = event.body;
       
-      // Si el body está en base64 (Netlify a veces lo codifica)
       if (event.isBase64Encoded) {
         bodyData = Buffer.from(event.body, 'base64').toString('utf-8');
       }
       
-      fetchOptions.body = bodyData;
+      try {
+        const credentials = JSON.parse(bodyData);
+        if (credentials.username) queryParams.append('username', credentials.username);
+        if (credentials.password) queryParams.append('password', credentials.password);
+      } catch (e) {
+        console.error('Error parsing body:', e);
+      }
       
-      console.log('POST to:', url);
-      console.log('Body:', bodyData);
+      url += `?${queryParams.toString()}`;
+      
+      console.log('Auth URL:', url.replace(/password=[^&]+/, 'password=***'));
+      
+      const response = await fetch(url, {
+        method: 'GET',
+        headers: { 'Accept': 'application/json' }
+      });
+      
+      const data = await response.json();
+      return { statusCode: 200, headers, body: JSON.stringify(data) };
     }
 
-    // Hacer petición a Honeycomb
-    const response = await fetch(url, fetchOptions);
-    const data = await response.json();
+    // Para otros endpoints: agregar parámetros GET normalmente
+    Object.keys(params).forEach(key => {
+      if (key !== 'endpoint') {
+        queryParams.append(key, params[key]);
+      }
+    });
 
-    console.log('Response:', JSON.stringify(data));
+    if (queryParams.toString()) {
+      url += `?${queryParams.toString()}`;
+    }
+
+    const response = await fetch(url, {
+      method: 'GET',
+      headers: { 'Accept': 'application/json' }
+    });
+
+    const data = await response.json();
 
     return {
       statusCode: 200,
@@ -96,4 +97,4 @@ exports.handler = async (event, context) => {
       })
     };
   }
-};;
+};
