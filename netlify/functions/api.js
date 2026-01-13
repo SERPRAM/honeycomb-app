@@ -33,32 +33,50 @@ exports.handler = async (event, context) => {
     // Construir URL de Honeycomb
     let url = `${HONEYCOMB_API}/${endpoint}`;
     
-    // Agregar otros parámetros (excepto 'endpoint')
-    const queryParams = new URLSearchParams();
-    Object.keys(params).forEach(key => {
-      if (key !== 'endpoint') {
-        queryParams.append(key, params[key]);
+    // Para GET: agregar parámetros a la URL (excepto 'endpoint')
+    if (event.httpMethod === 'GET') {
+      const queryParams = new URLSearchParams();
+      Object.keys(params).forEach(key => {
+        if (key !== 'endpoint') {
+          queryParams.append(key, params[key]);
+        }
+      });
+      
+      if (queryParams.toString()) {
+        url += `?${queryParams.toString()}`;
       }
-    });
-    
-    if (queryParams.toString()) {
-      url += `?${queryParams.toString()}`;
     }
 
     // Configurar fetch
     const fetchOptions = {
       method: event.httpMethod,
-      headers: { 'Content-Type': 'application/json' }
+      headers: { 
+        'Content-Type': 'application/json',
+        'Accept': 'application/json'
+      }
     };
 
-    // Si es POST, incluir body
+    // Si es POST, incluir body directamente
     if (event.httpMethod === 'POST' && event.body) {
-      fetchOptions.body = event.body;
+      // Parsear el body si viene como string
+      let bodyData = event.body;
+      
+      // Si el body está en base64 (Netlify a veces lo codifica)
+      if (event.isBase64Encoded) {
+        bodyData = Buffer.from(event.body, 'base64').toString('utf-8');
+      }
+      
+      fetchOptions.body = bodyData;
+      
+      console.log('POST to:', url);
+      console.log('Body:', bodyData);
     }
 
     // Hacer petición a Honeycomb
     const response = await fetch(url, fetchOptions);
     const data = await response.json();
+
+    console.log('Response:', JSON.stringify(data));
 
     return {
       statusCode: 200,
@@ -78,4 +96,4 @@ exports.handler = async (event, context) => {
       })
     };
   }
-};
+};;
