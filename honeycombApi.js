@@ -2,7 +2,6 @@
 const API_BASE_URL = 'https://honeycomb.omnidots.com/api/v1';
 
 const HoneycombAPI = {
-  // Autenticar usuario
   authenticate: async (username, password) => {
     try {
       const response = await fetch(`${API_BASE_URL}/user/authenticate`, {
@@ -11,8 +10,6 @@ const HoneycombAPI = {
           'Content-Type': 'application/json',
           'Accept': 'application/json'
         },
-        mode: 'cors',
-        credentials: 'omit',
         body: JSON.stringify({ username, password })
       });
       
@@ -26,7 +23,7 @@ const HoneycombAPI = {
       return data;
     } catch (error) {
       console.error('Error de autenticación:', error);
-      return { ok: false, message: 'Error de conexión con Honeycomb API. Verifica tu conexión o contacta a Omnidots para habilitar CORS.' };
+      return { ok: false, message: 'Error de conexión. Por favor contacta a Omnidots para habilitar CORS para tu dominio.' };
     }
   },
 
@@ -96,11 +93,4 @@ const HoneycombAPI = {
       freq_x: record.frequency_x || 0,
       freq_y: record.frequency_y || 0,
       freq_z: record.frequency_z || 0,
-      ppv_max: Math.max(record.ppv_x || 0, record.ppv_y || 0, record.ppv_z || 0),
-      max_axis: record.max_axis || 'Z',
-      dominant_freq: record.dominant_frequency || 0
-    }));
-  }
-};
-
-window.HoneycombAPI = HoneycombAPI;</parameter>
+      ppv_max: Math.max(record.ppv_x || 0, rec
