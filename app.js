@@ -1,4 +1,4 @@
-const { useState, useEffect, useCallback } = React;
+const { useState, useEffect, useCallback, useRef } = React;
 
 // Componente principal
 const HoneycombApp = () => {
@@ -15,6 +15,10 @@ const HoneycombApp = () => {
     const [lastUpdate, setLastUpdate] = useState(new Date());
     const [useRealAPI, setUseRealAPI] = useState(true);
     const [connectionStatus, setConnectionStatus] = useState('disconnected');
+    
+    // Refs para los inputs (evita problemas de foco)
+    const usernameRef = useRef(null);
+    const passwordRef = useRef(null);
 
     // Datos de ejemplo para modo demo
     const mockMeasuringPoints = [
@@ -39,9 +43,9 @@ const HoneycombApp = () => {
     ];
 
     const mockPeakRecords = [
-        { time: '14:23:18', date: '13-01-2026', ppv_x: 1.8, ppv_y: 2.1, ppv_z: 4.8, freq_x: 12, freq_y: 15, freq_z: 18, ppv_max: 4.8, max_axis: 'Z', dominant_freq: 18 },
-        { time: '14:28:45', date: '13-01-2026', ppv_x: 2.3, ppv_y: 3.2, ppv_z: 3.9, freq_x: 16, freq_y: 19, freq_z: 17, ppv_max: 3.9, max_axis: 'Z', dominant_freq: 17 },
-        { time: '14:35:52', date: '13-01-2026', ppv_x: 3.1, ppv_y: 2.8, ppv_z: 5.2, freq_x: 14, freq_y: 18, freq_z: 16, ppv_max: 5.2, max_axis: 'Z', dominant_freq: 16 }
+        { time: '14:23:18', date: '14-01-2026', ppv_x: 1.8, ppv_y: 2.1, ppv_z: 4.8, freq_x: 12, freq_y: 15, freq_z: 18, ppv_max: 4.8, max_axis: 'Z', dominant_freq: 18 },
+        { time: '14:28:45', date: '14-01-2026', ppv_x: 2.3, ppv_y: 3.2, ppv_z: 3.9, freq_x: 16, freq_y: 19, freq_z: 17, ppv_max: 3.9, max_axis: 'Z', dominant_freq: 17 },
+        { time: '14:35:52', date: '14-01-2026', ppv_x: 3.1, ppv_y: 2.8, ppv_z: 5.2, freq_x: 14, freq_y: 18, freq_z: 16, ppv_max: 5.2, max_axis: 'Z', dominant_freq: 16 }
     ];
 
     // Verificar token guardado al iniciar
@@ -66,14 +70,15 @@ const HoneycombApp = () => {
         return () => clearInterval(interval);
     }, [autoRefresh, currentScreen, token]);
 
-    // Reinicializar iconos Lucide después de cada render
+    // Reinicializar iconos Lucide SOLO cuando cambia la pantalla
     useEffect(() => {
-        setTimeout(() => {
+        const timer = setTimeout(() => {
             if (window.lucide) {
                 lucide.createIcons();
             }
-        }, 100);
-    }, [currentScreen, loading, measuringPoints, peakRecords]);
+        }, 150);
+        return () => clearTimeout(timer);
+    }, [currentScreen]); // SOLO currentScreen, no loading ni otros estados
 
     // Cargar datos iniciales con API real
     const loadInitialData = async () => {
@@ -95,7 +100,6 @@ const HoneycombApp = () => {
                             const record = latestPPV.record;
                             last_ppv = Math.max(record.ppv_x || 0, record.ppv_y || 0, record.ppv_z || 0);
                             
-                            // Calcular nivel de alarma según categoría DS N°38
                             if (point.category === 'CAT1') {
                                 if (last_ppv > 8) alarm_level = 'alert';
                                 else if (last_ppv > 6) alarm_level = 'warning';
@@ -134,10 +138,13 @@ const HoneycombApp = () => {
 
     // Login con API real
     const handleLogin = async () => {
+        const user = usernameRef.current?.value || username;
+        const pass = passwordRef.current?.value || password;
+        
         setLoading(true);
         setError('');
         
-        if (!username || !password) {
+        if (!user || !pass) {
             setError('Por favor ingresa usuario y contraseña');
             setLoading(false);
             return;
@@ -145,10 +152,11 @@ const HoneycombApp = () => {
         
         try {
             setConnectionStatus('connecting');
-            const result = await window.HoneycombAPI.authenticate(username, password);
+            const result = await window.HoneycombAPI.authenticate(user, pass);
             
             if (result.ok && result.token) {
                 setToken(result.token);
+                setUsername(user);
                 setUseRealAPI(true);
                 await loadInitialData();
             } else {
@@ -164,7 +172,7 @@ const HoneycombApp = () => {
         setLoading(false);
     };
 
-    // Modo demo (sin API real)
+    // Modo demo
     const handleDemoMode = () => {
         setUseRealAPI(false);
         setMeasuringPoints(mockMeasuringPoints);
@@ -176,12 +184,10 @@ const HoneycombApp = () => {
     // Refrescar datos
     const refreshData = async () => {
         if (!useRealAPI) {
-            // En modo demo, solo actualizar timestamp
             setLastUpdate(new Date());
             return;
         }
         
-        setLoading(true);
         try {
             const result = await window.HoneycombAPI.getMeasuringPoints();
             
@@ -224,12 +230,12 @@ const HoneycombApp = () => {
         } catch (err) {
             console.error('Error al refrescar:', err);
         }
-        setLoading(false);
     };
 
     // Cargar detalles de punto
     const loadPointDetails = async (point) => {
         setSelectedPoint(point);
+        setCurrentScreen('details');
         setLoading(true);
         
         try {
@@ -251,7 +257,11 @@ const HoneycombApp = () => {
         }
         
         setLoading(false);
-        setCurrentScreen('details');
+        
+        // Actualizar iconos después de cargar detalles
+        setTimeout(() => {
+            if (window.lucide) lucide.createIcons();
+        }, 100);
     };
 
     // Cerrar sesión
@@ -268,29 +278,16 @@ const HoneycombApp = () => {
         setUseRealAPI(true);
     };
 
-    // Handlers para inputs (evita re-render del componente completo)
-    const handleUsernameChange = useCallback((e) => {
-        setUsername(e.target.value);
-    }, []);
-
-    const handlePasswordChange = useCallback((e) => {
-        setPassword(e.target.value);
-    }, []);
-
-    const handleKeyPress = useCallback((e) => {
-        if (e.key === 'Enter') {
-            handleLogin();
-        }
-    }, [username, password]);
-
-    // Render principal - Todo en un solo componente para evitar re-renders
+    // ==================== PANTALLA LOGIN ====================
     if (currentScreen === 'login') {
         return (
             <div className="min-h-screen bg-gradient-to-br from-blue-500 to-blue-700 flex items-center justify-center p-4">
                 <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md p-8">
                     <div className="text-center mb-8">
                         <div className="bg-blue-500 w-20 h-20 rounded-full flex items-center justify-center mx-auto mb-4">
-                            <i data-lucide="activity" className="text-white" style={{width: '40px', height: '40px'}}></i>
+                            <svg xmlns="http://www.w3.org/2000/svg" width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                <polyline points="22 12 18 12 15 21 9 3 6 12 2 12"></polyline>
+                            </svg>
                         </div>
                         <h1 className="text-3xl font-bold text-gray-800">Honeycomb</h1>
                         <p className="text-gray-500 mt-2">Monitor Omnidots SWARM</p>
@@ -298,7 +295,11 @@ const HoneycombApp = () => {
 
                     {error && (
                         <div className="bg-red-50 border border-red-200 text-red-600 px-4 py-3 rounded-lg mb-4 flex items-center gap-2">
-                            <i data-lucide="alert-circle" style={{width: '20px', height: '20px'}}></i>
+                            <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                <circle cx="12" cy="12" r="10"></circle>
+                                <line x1="12" y1="8" x2="12" y2="12"></line>
+                                <line x1="12" y1="16" x2="12.01" y2="16"></line>
+                            </svg>
                             <span className="text-sm">{error}</span>
                         </div>
                     )}
@@ -307,10 +308,10 @@ const HoneycombApp = () => {
                         <div>
                             <label className="block text-sm font-medium text-gray-700 mb-2">Usuario Honeycomb</label>
                             <input
+                                ref={usernameRef}
                                 type="text"
-                                value={username}
-                                onChange={handleUsernameChange}
-                                className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                                defaultValue={username}
+                                className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none"
                                 placeholder="tu-usuario@empresa.cl"
                                 autoComplete="username"
                             />
@@ -319,11 +320,11 @@ const HoneycombApp = () => {
                         <div>
                             <label className="block text-sm font-medium text-gray-700 mb-2">Contraseña</label>
                             <input
+                                ref={passwordRef}
                                 type="password"
-                                value={password}
-                                onChange={handlePasswordChange}
-                                onKeyPress={handleKeyPress}
-                                className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                                defaultValue={password}
+                                onKeyDown={(e) => e.key === 'Enter' && handleLogin()}
+                                className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none"
                                 placeholder="••••••••"
                                 autoComplete="current-password"
                             />
@@ -336,12 +337,25 @@ const HoneycombApp = () => {
                         >
                             {loading ? (
                                 <>
-                                    <i data-lucide="loader" className="animate-spin" style={{width: '20px', height: '20px'}}></i>
+                                    <svg className="animate-spin" xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                        <line x1="12" y1="2" x2="12" y2="6"></line>
+                                        <line x1="12" y1="18" x2="12" y2="22"></line>
+                                        <line x1="4.93" y1="4.93" x2="7.76" y2="7.76"></line>
+                                        <line x1="16.24" y1="16.24" x2="19.07" y2="19.07"></line>
+                                        <line x1="2" y1="12" x2="6" y2="12"></line>
+                                        <line x1="18" y1="12" x2="22" y2="12"></line>
+                                        <line x1="4.93" y1="19.07" x2="7.76" y2="16.24"></line>
+                                        <line x1="16.24" y1="7.76" x2="19.07" y2="4.93"></line>
+                                    </svg>
                                     Conectando...
                                 </>
                             ) : (
                                 <>
-                                    <i data-lucide="log-in" style={{width: '20px', height: '20px'}}></i>
+                                    <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                        <path d="M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4"></path>
+                                        <polyline points="10 17 15 12 10 7"></polyline>
+                                        <line x1="15" y1="12" x2="3" y2="12"></line>
+                                    </svg>
                                     Iniciar Sesión
                                 </>
                             )}
@@ -360,7 +374,10 @@ const HoneycombApp = () => {
                             onClick={handleDemoMode}
                             className="w-full bg-gray-100 text-gray-700 py-3 rounded-lg font-semibold hover:bg-gray-200 transition flex items-center justify-center gap-2"
                         >
-                            <i data-lucide="play-circle" style={{width: '20px', height: '20px'}}></i>
+                            <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                <circle cx="12" cy="12" r="10"></circle>
+                                <polygon points="10 8 16 12 10 16 10 8"></polygon>
+                            </svg>
                             Entrar en Modo Demo
                         </button>
 
@@ -374,6 +391,7 @@ const HoneycombApp = () => {
         );
     }
 
+    // ==================== PANTALLA DASHBOARD ====================
     if (currentScreen === 'dashboard') {
         return (
             <div className="min-h-screen bg-gray-50">
@@ -386,7 +404,16 @@ const HoneycombApp = () => {
                                 className={`p-2 rounded-lg transition ${autoRefresh ? 'bg-blue-600' : 'hover:bg-blue-600'}`}
                                 title={autoRefresh ? 'Auto-refresh ON' : 'Auto-refresh OFF'}
                             >
-                                <i data-lucide={autoRefresh ? "pause" : "play"} style={{width: '20px', height: '20px'}}></i>
+                                {autoRefresh ? (
+                                    <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                        <rect x="6" y="4" width="4" height="16"></rect>
+                                        <rect x="14" y="4" width="4" height="16"></rect>
+                                    </svg>
+                                ) : (
+                                    <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                        <polygon points="5 3 19 12 5 21 5 3"></polygon>
+                                    </svg>
+                                )}
                             </button>
                             <button
                                 onClick={refreshData}
@@ -394,14 +421,22 @@ const HoneycombApp = () => {
                                 disabled={loading}
                                 title="Refrescar"
                             >
-                                <i data-lucide="refresh-cw" className={loading ? 'animate-spin' : ''} style={{width: '24px', height: '24px'}}></i>
+                                <svg className={loading ? 'animate-spin' : ''} xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                    <polyline points="23 4 23 10 17 10"></polyline>
+                                    <polyline points="1 20 1 14 7 14"></polyline>
+                                    <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"></path>
+                                </svg>
                             </button>
                             <button
                                 onClick={handleLogout}
                                 className="p-2 hover:bg-red-500 rounded-lg transition"
                                 title="Cerrar sesión"
                             >
-                                <i data-lucide="log-out" style={{width: '24px', height: '24px'}}></i>
+                                <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                    <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"></path>
+                                    <polyline points="16 17 21 12 16 7"></polyline>
+                                    <line x1="21" y1="12" x2="9" y2="12"></line>
+                                </svg>
                             </button>
                         </div>
                     </div>
@@ -424,7 +459,10 @@ const HoneycombApp = () => {
                 <div className="p-4 space-y-3">
                     {measuringPoints.length === 0 ? (
                         <div className="bg-white rounded-xl shadow-md p-8 text-center">
-                            <i data-lucide="inbox" className="mx-auto text-gray-400 mb-4" style={{width: '48px', height: '48px'}}></i>
+                            <svg className="mx-auto text-gray-400 mb-4" xmlns="http://www.w3.org/2000/svg" width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                <polyline points="22 12 16 12 14 15 10 15 8 12 2 12"></polyline>
+                                <path d="M5.45 5.11L2 12v6a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-6l-3.45-6.89A2 2 0 0 0 16.76 4H7.24a2 2 0 0 0-1.79 1.11z"></path>
+                            </svg>
                             <p className="text-gray-500">No hay puntos de medición disponibles</p>
                         </div>
                     ) : (
@@ -432,13 +470,24 @@ const HoneycombApp = () => {
                             <div
                                 key={point.id}
                                 onClick={() => loadPointDetails(point)}
-                                className="bg-white rounded-xl shadow-md p-4 cursor-pointer hover:shadow-lg transition active:scale-98"
+                                className="bg-white rounded-xl shadow-md p-4 cursor-pointer hover:shadow-lg transition"
                             >
                                 <div className="flex items-start justify-between mb-3">
                                     <div className="flex-1">
                                         <h3 className="font-bold text-gray-800 text-lg mb-1">{point.name}</h3>
                                         <div className="flex items-center gap-2 text-sm text-gray-500">
-                                            <i data-lucide="cpu" style={{width: '14px', height: '14px'}}></i>
+                                            <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                                <rect x="4" y="4" width="16" height="16" rx="2" ry="2"></rect>
+                                                <rect x="9" y="9" width="6" height="6"></rect>
+                                                <line x1="9" y1="1" x2="9" y2="4"></line>
+                                                <line x1="15" y1="1" x2="15" y2="4"></line>
+                                                <line x1="9" y1="20" x2="9" y2="23"></line>
+                                                <line x1="15" y1="20" x2="15" y2="23"></line>
+                                                <line x1="20" y1="9" x2="23" y2="9"></line>
+                                                <line x1="20" y1="14" x2="23" y2="14"></line>
+                                                <line x1="1" y1="9" x2="4" y2="9"></line>
+                                                <line x1="1" y1="14" x2="4" y2="14"></line>
+                                            </svg>
                                             <span>{point.sensor?.serial || 'Sin sensor'}</span>
                                         </div>
                                     </div>
@@ -463,14 +512,22 @@ const HoneycombApp = () => {
                                     </div>
                                     <div className="flex flex-col items-center justify-center">
                                         <div className="flex items-center gap-1">
-                                            <i data-lucide="battery" className={point.sensor?.battery_level < 50 ? 'text-red-500' : 'text-green-500'} style={{width: '16px', height: '16px'}}></i>
+                                            <svg className={point.sensor?.battery_level < 50 ? 'text-red-500' : 'text-green-500'} xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                                <rect x="1" y="6" width="18" height="12" rx="2" ry="2"></rect>
+                                                <line x1="23" y1="13" x2="23" y2="11"></line>
+                                            </svg>
                                             <span className="text-sm font-semibold">{Math.round(point.sensor?.battery_level || 0)}%</span>
                                         </div>
                                         <span className="text-xs text-gray-400">Batería</span>
                                     </div>
                                     <div className="flex flex-col items-center justify-center">
                                         <div className="flex items-center gap-1">
-                                            <i data-lucide="wifi" className="text-green-500" style={{width: '16px', height: '16px'}}></i>
+                                            <svg className="text-green-500" xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                                <path d="M5 12.55a11 11 0 0 1 14.08 0"></path>
+                                                <path d="M1.42 9a16 16 0 0 1 21.16 0"></path>
+                                                <path d="M8.53 16.11a6 6 0 0 1 6.95 0"></path>
+                                                <line x1="12" y1="20" x2="12.01" y2="20"></line>
+                                            </svg>
                                             <span className="text-sm font-semibold">{point.sensor?.signal_strength || 'N/A'}</span>
                                         </div>
                                         <span className="text-xs text-gray-400">Señal</span>
@@ -480,7 +537,9 @@ const HoneycombApp = () => {
                                 <div className="flex items-center justify-between text-xs text-gray-500 border-t pt-2">
                                     <span>{point.category} | {point.guide_line || 'Sin guía'}</span>
                                     <span className="flex items-center gap-1">
-                                        <i data-lucide="activity" style={{width: '12px', height: '12px'}}></i>
+                                        <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                            <polyline points="22 12 18 12 15 21 9 3 6 12 2 12"></polyline>
+                                        </svg>
                                         {point.active ? 'Activo' : 'Inactivo'}
                                     </span>
                                 </div>
@@ -492,6 +551,7 @@ const HoneycombApp = () => {
         );
     }
 
+    // ==================== PANTALLA DETALLES ====================
     if (currentScreen === 'details') {
         return (
             <div className="min-h-screen bg-gray-50">
@@ -500,7 +560,10 @@ const HoneycombApp = () => {
                         onClick={() => setCurrentScreen('dashboard')}
                         className="text-white mb-3 hover:underline flex items-center gap-1"
                     >
-                        <i data-lucide="arrow-left" style={{width: '16px', height: '16px'}}></i>
+                        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                            <line x1="19" y1="12" x2="5" y2="12"></line>
+                            <polyline points="12 19 5 12 12 5"></polyline>
+                        </svg>
                         Volver
                     </button>
                     <h1 className="text-xl font-bold mb-1">{selectedPoint?.name}</h1>
@@ -535,18 +598,33 @@ const HoneycombApp = () => {
                     {/* Registros PPV */}
                     <div className="bg-white rounded-xl shadow-md p-4 mb-4">
                         <h2 className="font-bold text-gray-800 mb-3 flex items-center gap-2">
-                            <i data-lucide="trending-up" className="text-blue-500" style={{width: '20px', height: '20px'}}></i>
+                            <svg className="text-blue-500" xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                <polyline points="23 6 13.5 15.5 8.5 10.5 1 18"></polyline>
+                                <polyline points="17 6 23 6 23 12"></polyline>
+                            </svg>
                             Registros Recientes PPV por Eje
                         </h2>
 
                         {loading ? (
                             <div className="text-center py-8">
-                                <i data-lucide="loader" className="animate-spin mx-auto text-blue-500" style={{width: '32px', height: '32px'}}></i>
+                                <svg className="animate-spin mx-auto text-blue-500" xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                    <line x1="12" y1="2" x2="12" y2="6"></line>
+                                    <line x1="12" y1="18" x2="12" y2="22"></line>
+                                    <line x1="4.93" y1="4.93" x2="7.76" y2="7.76"></line>
+                                    <line x1="16.24" y1="16.24" x2="19.07" y2="19.07"></line>
+                                    <line x1="2" y1="12" x2="6" y2="12"></line>
+                                    <line x1="18" y1="12" x2="22" y2="12"></line>
+                                    <line x1="4.93" y1="19.07" x2="7.76" y2="16.24"></line>
+                                    <line x1="16.24" y1="7.76" x2="19.07" y2="4.93"></line>
+                                </svg>
                                 <p className="text-gray-500 mt-2">Cargando registros...</p>
                             </div>
                         ) : peakRecords.length === 0 ? (
                             <div className="text-center py-8">
-                                <i data-lucide="inbox" className="mx-auto text-gray-400" style={{width: '32px', height: '32px'}}></i>
+                                <svg className="mx-auto text-gray-400" xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                    <polyline points="22 12 16 12 14 15 10 15 8 12 2 12"></polyline>
+                                    <path d="M5.45 5.11L2 12v6a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-6l-3.45-6.89A2 2 0 0 0 16.76 4H7.24a2 2 0 0 0-1.79 1.11z"></path>
+                                </svg>
                                 <p className="text-gray-500 mt-2">No hay registros disponibles</p>
                             </div>
                         ) : (
@@ -555,43 +633,40 @@ const HoneycombApp = () => {
                                     <div key={idx} className="border-b last:border-0 pb-3 last:pb-0">
                                         <div className="flex items-center justify-between mb-2">
                                             <div className="font-semibold text-gray-800">
-                                                <span className="text-blue-600">{record.date}</span>
+                                                <span className="text-blue-600">{record.date || 'Sin fecha'}</span>
                                                 <span className="mx-2 text-gray-400">|</span>
-                                                <span>{record.time}</span>
+                                                <span>{record.time || 'Sin hora'}</span>
                                             </div>
                                             <div className="text-xs bg-blue-100 text-blue-700 px-2 py-1 rounded">
-                                                Máx: {record.max_axis} • {record.dominant_freq} Hz
+                                                Máx: {record.max_axis || 'Z'} • {record.dominant_freq || 0} Hz
                                             </div>
                                         </div>
 
                                         <div className="grid grid-cols-3 gap-2">
                                             <div className="bg-red-50 rounded-lg p-2 border-l-4 border-red-500">
                                                 <div className="text-xs text-red-600 font-semibold mb-1">EJE X</div>
-                                                <div className="text-lg font-bold text-red-700">{record.ppv_x?.toFixed(2) || '0.00'}</div>
+                                                <div className="text-lg font-bold text-red-700">{(record.ppv_x || 0).toFixed(2)}</div>
                                                 <div className="text-xs text-gray-500">mm/s</div>
                                                 <div className="flex items-center gap-1 mt-1">
-                                                    <i data-lucide="waves" className="text-red-400" style={{width: '10px', height: '10px'}}></i>
-                                                    <span className="text-xs text-red-600">{record.freq_x || 0} Hz</span>
+                                                    <span className="text-xs text-red-600">≈ {record.freq_x || 0} Hz</span>
                                                 </div>
                                             </div>
 
                                             <div className="bg-green-50 rounded-lg p-2 border-l-4 border-green-500">
                                                 <div className="text-xs text-green-600 font-semibold mb-1">EJE Y</div>
-                                                <div className="text-lg font-bold text-green-700">{record.ppv_y?.toFixed(2) || '0.00'}</div>
+                                                <div className="text-lg font-bold text-green-700">{(record.ppv_y || 0).toFixed(2)}</div>
                                                 <div className="text-xs text-gray-500">mm/s</div>
                                                 <div className="flex items-center gap-1 mt-1">
-                                                    <i data-lucide="waves" className="text-green-400" style={{width: '10px', height: '10px'}}></i>
-                                                    <span className="text-xs text-green-600">{record.freq_y || 0} Hz</span>
+                                                    <span className="text-xs text-green-600">≈ {record.freq_y || 0} Hz</span>
                                                 </div>
                                             </div>
 
                                             <div className="bg-blue-50 rounded-lg p-2 border-l-4 border-blue-500">
                                                 <div className="text-xs text-blue-600 font-semibold mb-1">EJE Z</div>
-                                                <div className="text-lg font-bold text-blue-700">{record.ppv_z?.toFixed(2) || '0.00'}</div>
+                                                <div className="text-lg font-bold text-blue-700">{(record.ppv_z || 0).toFixed(2)}</div>
                                                 <div className="text-xs text-gray-500">mm/s</div>
                                                 <div className="flex items-center gap-1 mt-1">
-                                                    <i data-lucide="waves" className="text-blue-400" style={{width: '10px', height: '10px'}}></i>
-                                                    <span className="text-xs text-blue-600">{record.freq_z || 0} Hz</span>
+                                                    <span className="text-xs text-blue-600">≈ {record.freq_z || 0} Hz</span>
                                                 </div>
                                             </div>
                                         </div>
@@ -611,10 +686,3 @@ const HoneycombApp = () => {
 // Renderizar aplicación
 const root = ReactDOM.createRoot(document.getElementById('root'));
 root.render(<HoneycombApp />);
-
-// Inicializar iconos Lucide
-setTimeout(() => {
-    if (window.lucide) {
-        lucide.createIcons();
-    }
-}, 100);
