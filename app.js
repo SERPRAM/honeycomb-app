@@ -1,24 +1,159 @@
-const { useState, useEffect, useCallback, useRef } = React;
+const { useState, useEffect } = React;
 
-// Componente principal
+// ==================== COMPONENTE LOGIN SEPARADO ====================
+// Este componente maneja su propio estado interno para evitar re-renders
+const LoginForm = ({ onLogin, onDemoMode, initialError }) => {
+    const [username, setUsername] = useState('');
+    const [password, setPassword] = useState('');
+    const [loading, setLoading] = useState(false);
+    const [error, setError] = useState(initialError || '');
+
+    const handleSubmit = async () => {
+        if (!username || !password) {
+            setError('Por favor ingresa usuario y contraseña');
+            return;
+        }
+        
+        setLoading(true);
+        setError('');
+        
+        try {
+            const result = await window.HoneycombAPI.authenticate(username, password);
+            
+            if (result.ok && result.token) {
+                onLogin(result.token, username);
+            } else {
+                setError(result.message || 'Credenciales inválidas');
+            }
+        } catch (err) {
+            console.error('Error login:', err);
+            setError('Error de conexión con Honeycomb');
+        }
+        
+        setLoading(false);
+    };
+
+    return (
+        <div className="min-h-screen bg-gradient-to-br from-blue-500 to-blue-700 flex items-center justify-center p-4">
+            <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md p-8">
+                <div className="text-center mb-8">
+                    <div className="bg-blue-500 w-20 h-20 rounded-full flex items-center justify-center mx-auto mb-4">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                            <polyline points="22 12 18 12 15 21 9 3 6 12 2 12"></polyline>
+                        </svg>
+                    </div>
+                    <h1 className="text-3xl font-bold text-gray-800">Honeycomb</h1>
+                    <p className="text-gray-500 mt-2">Monitor Omnidots SWARM</p>
+                </div>
+
+                {error && (
+                    <div className="bg-red-50 border border-red-200 text-red-600 px-4 py-3 rounded-lg mb-4 flex items-center gap-2">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                            <circle cx="12" cy="12" r="10"></circle>
+                            <line x1="12" y1="8" x2="12" y2="12"></line>
+                            <line x1="12" y1="16" x2="12.01" y2="16"></line>
+                        </svg>
+                        <span className="text-sm">{error}</span>
+                    </div>
+                )}
+
+                <div className="space-y-4">
+                    <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-2">Usuario Honeycomb</label>
+                        <input
+                            type="text"
+                            value={username}
+                            onChange={(e) => setUsername(e.target.value)}
+                            className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none"
+                            placeholder="tu-usuario@empresa.cl"
+                            autoComplete="username"
+                            autoCapitalize="off"
+                            autoCorrect="off"
+                            spellCheck="false"
+                        />
+                    </div>
+
+                    <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-2">Contraseña</label>
+                        <input
+                            type="password"
+                            value={password}
+                            onChange={(e) => setPassword(e.target.value)}
+                            onKeyDown={(e) => e.key === 'Enter' && handleSubmit()}
+                            className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none"
+                            placeholder="••••••••"
+                            autoComplete="current-password"
+                        />
+                    </div>
+
+                    <button
+                        onClick={handleSubmit}
+                        disabled={loading}
+                        className="w-full bg-blue-500 text-white py-3 rounded-lg font-semibold hover:bg-blue-600 transition disabled:opacity-50 flex items-center justify-center gap-2"
+                    >
+                        {loading ? (
+                            <>
+                                <svg className="animate-spin" xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                                    <circle cx="12" cy="12" r="10" strokeOpacity="0.25"></circle>
+                                    <path d="M12 2a10 10 0 0 1 10 10" strokeOpacity="0.75"></path>
+                                </svg>
+                                Conectando...
+                            </>
+                        ) : (
+                            <>
+                                <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                                    <path d="M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4"></path>
+                                    <polyline points="10 17 15 12 10 7"></polyline>
+                                    <line x1="15" y1="12" x2="3" y2="12"></line>
+                                </svg>
+                                Iniciar Sesión
+                            </>
+                        )}
+                    </button>
+
+                    <div className="relative my-4">
+                        <div className="absolute inset-0 flex items-center">
+                            <div className="w-full border-t border-gray-300"></div>
+                        </div>
+                        <div className="relative flex justify-center text-sm">
+                            <span className="px-2 bg-white text-gray-500">o</span>
+                        </div>
+                    </div>
+
+                    <button
+                        onClick={onDemoMode}
+                        className="w-full bg-gray-100 text-gray-700 py-3 rounded-lg font-semibold hover:bg-gray-200 transition flex items-center justify-center gap-2"
+                    >
+                        <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                            <circle cx="12" cy="12" r="10"></circle>
+                            <polygon points="10 8 16 12 10 16 10 8"></polygon>
+                        </svg>
+                        Entrar en Modo Demo
+                    </button>
+
+                    <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 text-sm mt-4">
+                        <p className="text-blue-800 font-semibold mb-1">ℹ️ Información</p>
+                        <p className="text-blue-700">Usa tus credenciales de <strong>honeycomb.omnidots.com</strong> para conectarte a tus equipos SWARM reales.</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    );
+};
+
+// ==================== COMPONENTE PRINCIPAL ====================
 const HoneycombApp = () => {
     const [currentScreen, setCurrentScreen] = useState('login');
     const [token, setToken] = useState('');
     const [username, setUsername] = useState('');
-    const [password, setPassword] = useState('');
     const [measuringPoints, setMeasuringPoints] = useState([]);
     const [selectedPoint, setSelectedPoint] = useState(null);
     const [loading, setLoading] = useState(false);
-    const [error, setError] = useState('');
     const [peakRecords, setPeakRecords] = useState([]);
     const [autoRefresh, setAutoRefresh] = useState(true);
     const [lastUpdate, setLastUpdate] = useState(new Date());
     const [useRealAPI, setUseRealAPI] = useState(true);
     const [connectionStatus, setConnectionStatus] = useState('disconnected');
-    
-    // Refs para los inputs (evita problemas de foco)
-    const usernameRef = useRef(null);
-    const passwordRef = useRef(null);
 
     // Datos de ejemplo para modo demo
     const mockMeasuringPoints = [
@@ -70,17 +205,7 @@ const HoneycombApp = () => {
         return () => clearInterval(interval);
     }, [autoRefresh, currentScreen, token]);
 
-    // Reinicializar iconos Lucide SOLO cuando cambia la pantalla
-    useEffect(() => {
-        const timer = setTimeout(() => {
-            if (window.lucide) {
-                lucide.createIcons();
-            }
-        }, 150);
-        return () => clearTimeout(timer);
-    }, [currentScreen]); // SOLO currentScreen, no loading ni otros estados
-
-    // Cargar datos iniciales con API real
+    // Cargar datos iniciales
     const loadInitialData = async () => {
         setLoading(true);
         setConnectionStatus('connecting');
@@ -112,11 +237,7 @@ const HoneycombApp = () => {
                             }
                         }
                         
-                        return {
-                            ...point,
-                            last_ppv: parseFloat(last_ppv.toFixed(1)),
-                            alarm_level
-                        };
+                        return { ...point, last_ppv: parseFloat(last_ppv.toFixed(1)), alarm_level };
                     })
                 );
                 
@@ -125,51 +246,21 @@ const HoneycombApp = () => {
                 setConnectionStatus('connected');
                 setLastUpdate(new Date());
             } else {
-                setError(result.message || 'Error al cargar datos');
                 setConnectionStatus('error');
             }
         } catch (err) {
             console.error('Error cargando datos:', err);
-            setError('Error de conexión con Honeycomb');
             setConnectionStatus('error');
         }
         setLoading(false);
     };
 
-    // Login con API real
-    const handleLogin = async () => {
-        const user = usernameRef.current?.value || username;
-        const pass = passwordRef.current?.value || password;
-        
-        setLoading(true);
-        setError('');
-        
-        if (!user || !pass) {
-            setError('Por favor ingresa usuario y contraseña');
-            setLoading(false);
-            return;
-        }
-        
-        try {
-            setConnectionStatus('connecting');
-            const result = await window.HoneycombAPI.authenticate(user, pass);
-            
-            if (result.ok && result.token) {
-                setToken(result.token);
-                setUsername(user);
-                setUseRealAPI(true);
-                await loadInitialData();
-            } else {
-                setError(result.message || 'Credenciales inválidas');
-                setConnectionStatus('error');
-            }
-        } catch (err) {
-            console.error('Error login:', err);
-            setError('Error de conexión con Honeycomb');
-            setConnectionStatus('error');
-        }
-        
-        setLoading(false);
+    // Callback cuando login es exitoso
+    const handleLoginSuccess = (newToken, user) => {
+        setToken(newToken);
+        setUsername(user);
+        setUseRealAPI(true);
+        loadInitialData();
     };
 
     // Modo demo
@@ -215,11 +306,7 @@ const HoneycombApp = () => {
                             }
                         }
                         
-                        return {
-                            ...point,
-                            last_ppv: parseFloat(last_ppv.toFixed(1)),
-                            alarm_level
-                        };
+                        return { ...point, last_ppv: parseFloat(last_ppv.toFixed(1)), alarm_level };
                     })
                 );
                 
@@ -257,11 +344,6 @@ const HoneycombApp = () => {
         }
         
         setLoading(false);
-        
-        // Actualizar iconos después de cargar detalles
-        setTimeout(() => {
-            if (window.lucide) lucide.createIcons();
-        }, 100);
     };
 
     // Cerrar sesión
@@ -271,7 +353,6 @@ const HoneycombApp = () => {
         }
         setToken('');
         setUsername('');
-        setPassword('');
         setMeasuringPoints([]);
         setCurrentScreen('login');
         setConnectionStatus('disconnected');
@@ -281,113 +362,10 @@ const HoneycombApp = () => {
     // ==================== PANTALLA LOGIN ====================
     if (currentScreen === 'login') {
         return (
-            <div className="min-h-screen bg-gradient-to-br from-blue-500 to-blue-700 flex items-center justify-center p-4">
-                <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md p-8">
-                    <div className="text-center mb-8">
-                        <div className="bg-blue-500 w-20 h-20 rounded-full flex items-center justify-center mx-auto mb-4">
-                            <svg xmlns="http://www.w3.org/2000/svg" width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                                <polyline points="22 12 18 12 15 21 9 3 6 12 2 12"></polyline>
-                            </svg>
-                        </div>
-                        <h1 className="text-3xl font-bold text-gray-800">Honeycomb</h1>
-                        <p className="text-gray-500 mt-2">Monitor Omnidots SWARM</p>
-                    </div>
-
-                    {error && (
-                        <div className="bg-red-50 border border-red-200 text-red-600 px-4 py-3 rounded-lg mb-4 flex items-center gap-2">
-                            <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                                <circle cx="12" cy="12" r="10"></circle>
-                                <line x1="12" y1="8" x2="12" y2="12"></line>
-                                <line x1="12" y1="16" x2="12.01" y2="16"></line>
-                            </svg>
-                            <span className="text-sm">{error}</span>
-                        </div>
-                    )}
-
-                    <div className="space-y-4">
-                        <div>
-                            <label className="block text-sm font-medium text-gray-700 mb-2">Usuario Honeycomb</label>
-                            <input
-                                ref={usernameRef}
-                                type="text"
-                                defaultValue={username}
-                                className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none"
-                                placeholder="tu-usuario@empresa.cl"
-                                autoComplete="username"
-                            />
-                        </div>
-
-                        <div>
-                            <label className="block text-sm font-medium text-gray-700 mb-2">Contraseña</label>
-                            <input
-                                ref={passwordRef}
-                                type="password"
-                                defaultValue={password}
-                                onKeyDown={(e) => e.key === 'Enter' && handleLogin()}
-                                className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none"
-                                placeholder="••••••••"
-                                autoComplete="current-password"
-                            />
-                        </div>
-
-                        <button
-                            onClick={handleLogin}
-                            disabled={loading}
-                            className="w-full bg-blue-500 text-white py-3 rounded-lg font-semibold hover:bg-blue-600 transition disabled:opacity-50 flex items-center justify-center gap-2"
-                        >
-                            {loading ? (
-                                <>
-                                    <svg className="animate-spin" xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                                        <line x1="12" y1="2" x2="12" y2="6"></line>
-                                        <line x1="12" y1="18" x2="12" y2="22"></line>
-                                        <line x1="4.93" y1="4.93" x2="7.76" y2="7.76"></line>
-                                        <line x1="16.24" y1="16.24" x2="19.07" y2="19.07"></line>
-                                        <line x1="2" y1="12" x2="6" y2="12"></line>
-                                        <line x1="18" y1="12" x2="22" y2="12"></line>
-                                        <line x1="4.93" y1="19.07" x2="7.76" y2="16.24"></line>
-                                        <line x1="16.24" y1="7.76" x2="19.07" y2="4.93"></line>
-                                    </svg>
-                                    Conectando...
-                                </>
-                            ) : (
-                                <>
-                                    <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                                        <path d="M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4"></path>
-                                        <polyline points="10 17 15 12 10 7"></polyline>
-                                        <line x1="15" y1="12" x2="3" y2="12"></line>
-                                    </svg>
-                                    Iniciar Sesión
-                                </>
-                            )}
-                        </button>
-
-                        <div className="relative my-4">
-                            <div className="absolute inset-0 flex items-center">
-                                <div className="w-full border-t border-gray-300"></div>
-                            </div>
-                            <div className="relative flex justify-center text-sm">
-                                <span className="px-2 bg-white text-gray-500">o</span>
-                            </div>
-                        </div>
-
-                        <button
-                            onClick={handleDemoMode}
-                            className="w-full bg-gray-100 text-gray-700 py-3 rounded-lg font-semibold hover:bg-gray-200 transition flex items-center justify-center gap-2"
-                        >
-                            <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                                <circle cx="12" cy="12" r="10"></circle>
-                                <polygon points="10 8 16 12 10 16 10 8"></polygon>
-                            </svg>
-                            Entrar en Modo Demo
-                        </button>
-
-                        <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 text-sm mt-4">
-                            <p className="text-blue-800 font-semibold mb-1">ℹ️ Información</p>
-                            <p className="text-blue-700">Usa tus credenciales de <strong>honeycomb.omnidots.com</strong> para conectarte a tus equipos SWARM reales.</p>
-                        </div>
-                    </div>
-                </div>
-            </div>
+            <LoginForm 
+                onLogin={handleLoginSuccess} 
+                onDemoMode={handleDemoMode}
+            />
         );
     }
 
@@ -404,39 +382,21 @@ const HoneycombApp = () => {
                                 className={`p-2 rounded-lg transition ${autoRefresh ? 'bg-blue-600' : 'hover:bg-blue-600'}`}
                                 title={autoRefresh ? 'Auto-refresh ON' : 'Auto-refresh OFF'}
                             >
-                                {autoRefresh ? (
-                                    <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                                        <rect x="6" y="4" width="4" height="16"></rect>
-                                        <rect x="14" y="4" width="4" height="16"></rect>
-                                    </svg>
-                                ) : (
-                                    <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                                        <polygon points="5 3 19 12 5 21 5 3"></polygon>
-                                    </svg>
-                                )}
+                                {autoRefresh ? '⏸' : '▶'}
                             </button>
                             <button
                                 onClick={refreshData}
                                 className="p-2 hover:bg-blue-600 rounded-lg transition"
-                                disabled={loading}
                                 title="Refrescar"
                             >
-                                <svg className={loading ? 'animate-spin' : ''} xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                                    <polyline points="23 4 23 10 17 10"></polyline>
-                                    <polyline points="1 20 1 14 7 14"></polyline>
-                                    <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"></path>
-                                </svg>
+                                🔄
                             </button>
                             <button
                                 onClick={handleLogout}
                                 className="p-2 hover:bg-red-500 rounded-lg transition"
                                 title="Cerrar sesión"
                             >
-                                <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                                    <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"></path>
-                                    <polyline points="16 17 21 12 16 7"></polyline>
-                                    <line x1="21" y1="12" x2="9" y2="12"></line>
-                                </svg>
+                                🚪
                             </button>
                         </div>
                     </div>
@@ -459,11 +419,7 @@ const HoneycombApp = () => {
                 <div className="p-4 space-y-3">
                     {measuringPoints.length === 0 ? (
                         <div className="bg-white rounded-xl shadow-md p-8 text-center">
-                            <svg className="mx-auto text-gray-400 mb-4" xmlns="http://www.w3.org/2000/svg" width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                                <polyline points="22 12 16 12 14 15 10 15 8 12 2 12"></polyline>
-                                <path d="M5.45 5.11L2 12v6a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-6l-3.45-6.89A2 2 0 0 0 16.76 4H7.24a2 2 0 0 0-1.79 1.11z"></path>
-                            </svg>
-                            <p className="text-gray-500">No hay puntos de medición disponibles</p>
+                            <p className="text-gray-500">📭 No hay puntos de medición disponibles</p>
                         </div>
                     ) : (
                         measuringPoints.map(point => (
@@ -476,19 +432,7 @@ const HoneycombApp = () => {
                                     <div className="flex-1">
                                         <h3 className="font-bold text-gray-800 text-lg mb-1">{point.name}</h3>
                                         <div className="flex items-center gap-2 text-sm text-gray-500">
-                                            <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                                                <rect x="4" y="4" width="16" height="16" rx="2" ry="2"></rect>
-                                                <rect x="9" y="9" width="6" height="6"></rect>
-                                                <line x1="9" y1="1" x2="9" y2="4"></line>
-                                                <line x1="15" y1="1" x2="15" y2="4"></line>
-                                                <line x1="9" y1="20" x2="9" y2="23"></line>
-                                                <line x1="15" y1="20" x2="15" y2="23"></line>
-                                                <line x1="20" y1="9" x2="23" y2="9"></line>
-                                                <line x1="20" y1="14" x2="23" y2="14"></line>
-                                                <line x1="1" y1="9" x2="4" y2="9"></line>
-                                                <line x1="1" y1="14" x2="4" y2="14"></line>
-                                            </svg>
-                                            <span>{point.sensor?.serial || 'Sin sensor'}</span>
+                                            <span>📡 {point.sensor?.serial || 'Sin sensor'}</span>
                                         </div>
                                     </div>
                                     <div className={`px-3 py-1 rounded-full text-xs font-semibold ${
@@ -505,43 +449,21 @@ const HoneycombApp = () => {
                                     <div className="text-center bg-blue-50 rounded-lg py-2">
                                         <div className="text-2xl font-bold text-blue-600">{point.last_ppv}</div>
                                         <div className="text-xs text-gray-500">PPV (mm/s)</div>
-                                        <div className="text-xs text-green-600 mt-1 flex items-center justify-center gap-1">
-                                            <span className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></span>
-                                            EN VIVO
-                                        </div>
+                                        <div className="text-xs text-green-600 mt-1">🟢 EN VIVO</div>
                                     </div>
                                     <div className="flex flex-col items-center justify-center">
-                                        <div className="flex items-center gap-1">
-                                            <svg className={point.sensor?.battery_level < 50 ? 'text-red-500' : 'text-green-500'} xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                                                <rect x="1" y="6" width="18" height="12" rx="2" ry="2"></rect>
-                                                <line x1="23" y1="13" x2="23" y2="11"></line>
-                                            </svg>
-                                            <span className="text-sm font-semibold">{Math.round(point.sensor?.battery_level || 0)}%</span>
-                                        </div>
+                                        <span className="text-sm font-semibold">🔋 {Math.round(point.sensor?.battery_level || 0)}%</span>
                                         <span className="text-xs text-gray-400">Batería</span>
                                     </div>
                                     <div className="flex flex-col items-center justify-center">
-                                        <div className="flex items-center gap-1">
-                                            <svg className="text-green-500" xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                                                <path d="M5 12.55a11 11 0 0 1 14.08 0"></path>
-                                                <path d="M1.42 9a16 16 0 0 1 21.16 0"></path>
-                                                <path d="M8.53 16.11a6 6 0 0 1 6.95 0"></path>
-                                                <line x1="12" y1="20" x2="12.01" y2="20"></line>
-                                            </svg>
-                                            <span className="text-sm font-semibold">{point.sensor?.signal_strength || 'N/A'}</span>
-                                        </div>
+                                        <span className="text-sm font-semibold">📶 {point.sensor?.signal_strength || 'N/A'}</span>
                                         <span className="text-xs text-gray-400">Señal</span>
                                     </div>
                                 </div>
 
                                 <div className="flex items-center justify-between text-xs text-gray-500 border-t pt-2">
                                     <span>{point.category} | {point.guide_line || 'Sin guía'}</span>
-                                    <span className="flex items-center gap-1">
-                                        <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                                            <polyline points="22 12 18 12 15 21 9 3 6 12 2 12"></polyline>
-                                        </svg>
-                                        {point.active ? 'Activo' : 'Inactivo'}
-                                    </span>
+                                    <span>📊 {point.active ? 'Activo' : 'Inactivo'}</span>
                                 </div>
                             </div>
                         ))
@@ -560,14 +482,10 @@ const HoneycombApp = () => {
                         onClick={() => setCurrentScreen('dashboard')}
                         className="text-white mb-3 hover:underline flex items-center gap-1"
                     >
-                        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                            <line x1="19" y1="12" x2="5" y2="12"></line>
-                            <polyline points="12 19 5 12 12 5"></polyline>
-                        </svg>
-                        Volver
+                        ← Volver
                     </button>
                     <h1 className="text-xl font-bold mb-1">{selectedPoint?.name}</h1>
-                    <p className="text-blue-100 text-sm">{selectedPoint?.sensor?.serial || 'Sin sensor'}</p>
+                    <p className="text-blue-100 text-sm">📡 {selectedPoint?.sensor?.serial || 'Sin sensor'}</p>
                 </div>
 
                 <div className="p-4">
@@ -597,35 +515,15 @@ const HoneycombApp = () => {
 
                     {/* Registros PPV */}
                     <div className="bg-white rounded-xl shadow-md p-4 mb-4">
-                        <h2 className="font-bold text-gray-800 mb-3 flex items-center gap-2">
-                            <svg className="text-blue-500" xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                                <polyline points="23 6 13.5 15.5 8.5 10.5 1 18"></polyline>
-                                <polyline points="17 6 23 6 23 12"></polyline>
-                            </svg>
-                            Registros Recientes PPV por Eje
-                        </h2>
+                        <h2 className="font-bold text-gray-800 mb-3">📈 Registros Recientes PPV por Eje</h2>
 
                         {loading ? (
                             <div className="text-center py-8">
-                                <svg className="animate-spin mx-auto text-blue-500" xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                                    <line x1="12" y1="2" x2="12" y2="6"></line>
-                                    <line x1="12" y1="18" x2="12" y2="22"></line>
-                                    <line x1="4.93" y1="4.93" x2="7.76" y2="7.76"></line>
-                                    <line x1="16.24" y1="16.24" x2="19.07" y2="19.07"></line>
-                                    <line x1="2" y1="12" x2="6" y2="12"></line>
-                                    <line x1="18" y1="12" x2="22" y2="12"></line>
-                                    <line x1="4.93" y1="19.07" x2="7.76" y2="16.24"></line>
-                                    <line x1="16.24" y1="7.76" x2="19.07" y2="4.93"></line>
-                                </svg>
-                                <p className="text-gray-500 mt-2">Cargando registros...</p>
+                                <p className="text-gray-500">⏳ Cargando registros...</p>
                             </div>
                         ) : peakRecords.length === 0 ? (
                             <div className="text-center py-8">
-                                <svg className="mx-auto text-gray-400" xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                                    <polyline points="22 12 16 12 14 15 10 15 8 12 2 12"></polyline>
-                                    <path d="M5.45 5.11L2 12v6a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-6l-3.45-6.89A2 2 0 0 0 16.76 4H7.24a2 2 0 0 0-1.79 1.11z"></path>
-                                </svg>
-                                <p className="text-gray-500 mt-2">No hay registros disponibles</p>
+                                <p className="text-gray-500">📭 No hay registros disponibles</p>
                             </div>
                         ) : (
                             <div className="space-y-3">
@@ -647,27 +545,21 @@ const HoneycombApp = () => {
                                                 <div className="text-xs text-red-600 font-semibold mb-1">EJE X</div>
                                                 <div className="text-lg font-bold text-red-700">{(record.ppv_x || 0).toFixed(2)}</div>
                                                 <div className="text-xs text-gray-500">mm/s</div>
-                                                <div className="flex items-center gap-1 mt-1">
-                                                    <span className="text-xs text-red-600">≈ {record.freq_x || 0} Hz</span>
-                                                </div>
+                                                <div className="text-xs text-red-600 mt-1">≈ {record.freq_x || 0} Hz</div>
                                             </div>
 
                                             <div className="bg-green-50 rounded-lg p-2 border-l-4 border-green-500">
                                                 <div className="text-xs text-green-600 font-semibold mb-1">EJE Y</div>
                                                 <div className="text-lg font-bold text-green-700">{(record.ppv_y || 0).toFixed(2)}</div>
                                                 <div className="text-xs text-gray-500">mm/s</div>
-                                                <div className="flex items-center gap-1 mt-1">
-                                                    <span className="text-xs text-green-600">≈ {record.freq_y || 0} Hz</span>
-                                                </div>
+                                                <div className="text-xs text-green-600 mt-1">≈ {record.freq_y || 0} Hz</div>
                                             </div>
 
                                             <div className="bg-blue-50 rounded-lg p-2 border-l-4 border-blue-500">
                                                 <div className="text-xs text-blue-600 font-semibold mb-1">EJE Z</div>
                                                 <div className="text-lg font-bold text-blue-700">{(record.ppv_z || 0).toFixed(2)}</div>
                                                 <div className="text-xs text-gray-500">mm/s</div>
-                                                <div className="flex items-center gap-1 mt-1">
-                                                    <span className="text-xs text-blue-600">≈ {record.freq_z || 0} Hz</span>
-                                                </div>
+                                                <div className="text-xs text-blue-600 mt-1">≈ {record.freq_z || 0} Hz</div>
                                             </div>
                                         </div>
                                     </div>
