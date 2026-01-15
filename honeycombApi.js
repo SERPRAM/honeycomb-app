@@ -6,10 +6,8 @@ const HoneycombAPI = {
   getBaseUrl: () => {
     const host = window.location.hostname;
     if (host === 'localhost' || host === '127.0.0.1') {
-      // En desarrollo local, usar proxy de allorigins (limitado)
       return 'https://api.allorigins.win/raw?url=' + encodeURIComponent('https://honeycomb.omnidots.com/api/v1');
     }
-    // En Netlify, usar nuestra función proxy
     return '/.netlify/functions/api';
   },
 
@@ -20,14 +18,12 @@ const HoneycombAPI = {
       let response;
 
       if (baseUrl.includes('allorigins')) {
-        // Método directo (puede fallar por CORS)
         response = await fetch('https://honeycomb.omnidots.com/api/v1/user/authenticate', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ username, password })
         });
       } else {
-        // Usar proxy de Netlify
         response = await fetch(`${baseUrl}?endpoint=user/authenticate`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -93,11 +89,9 @@ const HoneycombAPI = {
       
       let url;
       if (baseUrl.includes('allorigins')) {
-        // Para allorigins (desarrollo)
         const apiUrl = `https://honeycomb.omnidots.com/api/v1/${endpoint}?${queryParams}`;
         url = 'https://api.allorigins.win/raw?url=' + encodeURIComponent(apiUrl);
       } else {
-        // Para Netlify Functions
         url = `${baseUrl}?endpoint=${endpoint}&${queryParams}`;
       }
 
@@ -119,24 +113,49 @@ const HoneycombAPI = {
     return await HoneycombAPI.request('list_sensors');
   },
 
-  // Obtener registros PPV
+  // Obtener registros PPV - CORREGIDO: ahora incluye start_time
   getPeakRecords: async (measuringPointId, limit = 20) => {
+    // Calcular start_time: últimas 24 horas
+    const now = new Date();
+    const startTime = new Date(now.getTime() - 24 * 60 * 60 * 1000); // 24 horas atrás
+    
     return await HoneycombAPI.request('get_peak_records', {
       measuring_point_id: measuringPointId,
+      start_time: startTime.toISOString(),
       limit: limit
     });
   },
 
+  // Obtener registros PPV con rango de tiempo personalizado
+  getPeakRecordsRange: async (measuringPointId, startTime, endTime, limit = 100) => {
+    const params = {
+      measuring_point_id: measuringPointId,
+      start_time: startTime.toISOString(),
+      limit: limit
+    };
+    
+    if (endTime) {
+      params.end_time = endTime.toISOString();
+    }
+    
+    return await HoneycombAPI.request('get_peak_records', params);
+  },
+
   // Obtener registros VDV
   getVDVRecords: async (measuringPointId, limit = 20) => {
+    const now = new Date();
+    const startTime = new Date(now.getTime() - 24 * 60 * 60 * 1000);
+    
     return await HoneycombAPI.request('get_vdv_records', {
       measuring_point_id: measuringPointId,
+      start_time: startTime.toISOString(),
       limit: limit
     });
   },
 
   // Obtener último PPV de un punto
   getLatestPPV: async (measuringPointId) => {
+    // Buscar en las últimas 24 horas
     const result = await HoneycombAPI.getPeakRecords(measuringPointId, 1);
     
     if (result.ok && result.records && result.records.length > 0) {
@@ -150,21 +169,62 @@ const HoneycombAPI = {
   parseTriaxialData: (records) => {
     if (!Array.isArray(records)) return [];
     
-    return records.map(record => ({
-      id: record.id,
-      timestamp: record.timestamp,
-      time: new Date(record.timestamp).toLocaleTimeString('es-CL'),
-      date: new Date(record.timestamp).toLocaleDateString('es-CL'),
-      ppv_x: record.ppv_x || 0,
-      ppv_y: record.ppv_y || 0,
-      ppv_z: record.ppv_z || 0,
-      freq_x: record.frequency_x || 0,
-      freq_y: record.frequency_y || 0,
-      freq_z: record.frequency_z || 0,
-      ppv_max: Math.max(record.ppv_x || 0, record.ppv_y || 0, record.ppv_z || 0),
-      max_axis: record.max_axis || 'Z',
-      dominant_freq: record.dominant_frequency || 0
-    }));
+    return records.map(record => {
+      // Parsear timestamp
+      let dateStr = 'Sin fecha';
+      let timeStr = 'Sin hora';
+      
+      if (record.timestamp) {
+        const date = new Date(record.timestamp);
+        dateStr = date.toLocaleDateString('es-CL', {
+          day: '2-digit',
+          month: '2-digit',
+          year: 'numeric'
+        });
+        timeStr = date.toLocaleTimeString('es-CL', {
+          hour: '2-digit',
+          minute: '2-digit',
+          second: '2-digit'
+        });
+      }
+      
+      // Obtener valores PPV
+      const ppv_x = parseFloat(record.ppv_x) || 0;
+      const ppv_y = parseFloat(record.ppv_y) || 0;
+      const ppv_z = parseFloat(record.ppv_z) || 0;
+      
+      // Calcular máximo y eje dominante
+      const ppv_max = Math.max(ppv_x, ppv_y, ppv_z);
+      let max_axis = 'Z';
+      if (ppv_x >= ppv_y && ppv_x >= ppv_z) max_axis = 'X';
+      else if (ppv_y >= ppv_x && ppv_y >= ppv_z) max_axis = 'Y';
+      
+      // Frecuencias
+      const freq_x = parseFloat(record.frequency_x) || parseFloat(record.freq_x) || 0;
+      const freq_y = parseFloat(record.frequency_y) || parseFloat(record.freq_y) || 0;
+      const freq_z = parseFloat(record.frequency_z) || parseFloat(record.freq_z) || 0;
+      
+      // Frecuencia dominante
+      let dominant_freq = freq_z;
+      if (max_axis === 'X') dominant_freq = freq_x;
+      else if (max_axis === 'Y') dominant_freq = freq_y;
+      
+      return {
+        id: record.id,
+        timestamp: record.timestamp,
+        date: dateStr,
+        time: timeStr,
+        ppv_x,
+        ppv_y,
+        ppv_z,
+        freq_x,
+        freq_y,
+        freq_z,
+        ppv_max,
+        max_axis,
+        dominant_freq: Math.round(dominant_freq)
+      };
+    });
   }
 };
 
