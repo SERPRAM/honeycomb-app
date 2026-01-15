@@ -113,15 +113,20 @@ const HoneycombAPI = {
     return await HoneycombAPI.request('list_sensors');
   },
 
-  // Obtener registros PPV - CORREGIDO: start_time como Unix timestamp (segundos)
+  // Obtener registros PPV - Con start_time y end_time explícitos
   getPeakRecords: async (measuringPointId, limit = 20) => {
-    // Calcular start_time: últimas 24 horas como Unix timestamp en SEGUNDOS
-    const now = Math.floor(Date.now() / 1000); // Timestamp actual en segundos
-    const startTime = now - (24 * 60 * 60); // 24 horas atrás en segundos
+    // Usar timestamp Unix en SEGUNDOS
+    // end_time = ahora
+    // start_time = 1 hora atrás (para estar seguros del rango)
+    const endTime = Math.floor(Date.now() / 1000);
+    const startTime = endTime - 3600; // 1 hora = 3600 segundos
+    
+    console.log('getPeakRecords - startTime:', startTime, 'endTime:', endTime);
     
     return await HoneycombAPI.request('get_peak_records', {
       measuring_point_id: measuringPointId,
       start_time: startTime,
+      end_time: endTime,
       limit: limit
     });
   },
@@ -129,27 +134,25 @@ const HoneycombAPI = {
   // Obtener registros PPV con rango de tiempo personalizado
   getPeakRecordsRange: async (measuringPointId, startDate, endDate, limit = 100) => {
     const startTime = Math.floor(startDate.getTime() / 1000);
-    const params = {
+    const endTime = Math.floor(endDate.getTime() / 1000);
+    
+    return await HoneycombAPI.request('get_peak_records', {
       measuring_point_id: measuringPointId,
       start_time: startTime,
+      end_time: endTime,
       limit: limit
-    };
-    
-    if (endDate) {
-      params.end_time = Math.floor(endDate.getTime() / 1000);
-    }
-    
-    return await HoneycombAPI.request('get_peak_records', params);
+    });
   },
 
   // Obtener registros VDV
   getVDVRecords: async (measuringPointId, limit = 20) => {
-    const now = Math.floor(Date.now() / 1000);
-    const startTime = now - (24 * 60 * 60);
+    const endTime = Math.floor(Date.now() / 1000);
+    const startTime = endTime - 3600;
     
     return await HoneycombAPI.request('get_vdv_records', {
       measuring_point_id: measuringPointId,
       start_time: startTime,
+      end_time: endTime,
       limit: limit
     });
   },
@@ -177,7 +180,7 @@ const HoneycombAPI = {
       if (record.timestamp) {
         // timestamp puede venir en segundos o milisegundos
         let ts = record.timestamp;
-        if (ts < 10000000000) ts = ts * 1000; // Convertir de segundos a ms si es necesario
+        if (ts < 10000000000) ts = ts * 1000; // Convertir de segundos a ms
         
         const date = new Date(ts);
         dateStr = date.toLocaleDateString('es-CL', {
