@@ -113,29 +113,30 @@ const HoneycombAPI = {
     return await HoneycombAPI.request('list_sensors');
   },
 
-  // Obtener registros PPV - CORREGIDO: ahora incluye start_time
+  // Obtener registros PPV - CORREGIDO: start_time como Unix timestamp (segundos)
   getPeakRecords: async (measuringPointId, limit = 20) => {
-    // Calcular start_time: últimas 24 horas
-    const now = new Date();
-    const startTime = new Date(now.getTime() - 24 * 60 * 60 * 1000); // 24 horas atrás
+    // Calcular start_time: últimas 24 horas como Unix timestamp en SEGUNDOS
+    const now = Math.floor(Date.now() / 1000); // Timestamp actual en segundos
+    const startTime = now - (24 * 60 * 60); // 24 horas atrás en segundos
     
     return await HoneycombAPI.request('get_peak_records', {
       measuring_point_id: measuringPointId,
-      start_time: startTime.toISOString(),
+      start_time: startTime,
       limit: limit
     });
   },
 
   // Obtener registros PPV con rango de tiempo personalizado
-  getPeakRecordsRange: async (measuringPointId, startTime, endTime, limit = 100) => {
+  getPeakRecordsRange: async (measuringPointId, startDate, endDate, limit = 100) => {
+    const startTime = Math.floor(startDate.getTime() / 1000);
     const params = {
       measuring_point_id: measuringPointId,
-      start_time: startTime.toISOString(),
+      start_time: startTime,
       limit: limit
     };
     
-    if (endTime) {
-      params.end_time = endTime.toISOString();
+    if (endDate) {
+      params.end_time = Math.floor(endDate.getTime() / 1000);
     }
     
     return await HoneycombAPI.request('get_peak_records', params);
@@ -143,19 +144,18 @@ const HoneycombAPI = {
 
   // Obtener registros VDV
   getVDVRecords: async (measuringPointId, limit = 20) => {
-    const now = new Date();
-    const startTime = new Date(now.getTime() - 24 * 60 * 60 * 1000);
+    const now = Math.floor(Date.now() / 1000);
+    const startTime = now - (24 * 60 * 60);
     
     return await HoneycombAPI.request('get_vdv_records', {
       measuring_point_id: measuringPointId,
-      start_time: startTime.toISOString(),
+      start_time: startTime,
       limit: limit
     });
   },
 
   // Obtener último PPV de un punto
   getLatestPPV: async (measuringPointId) => {
-    // Buscar en las últimas 24 horas
     const result = await HoneycombAPI.getPeakRecords(measuringPointId, 1);
     
     if (result.ok && result.records && result.records.length > 0) {
@@ -175,7 +175,11 @@ const HoneycombAPI = {
       let timeStr = 'Sin hora';
       
       if (record.timestamp) {
-        const date = new Date(record.timestamp);
+        // timestamp puede venir en segundos o milisegundos
+        let ts = record.timestamp;
+        if (ts < 10000000000) ts = ts * 1000; // Convertir de segundos a ms si es necesario
+        
+        const date = new Date(ts);
         dateStr = date.toLocaleDateString('es-CL', {
           day: '2-digit',
           month: '2-digit',
